@@ -21,9 +21,7 @@ HOST = "rabbit"
 PORT = 5672
 VHOST = "/"
 EXCHANGE = "default"
-QUEUE = "celery"
-ROUTING_KEY = "celery"
-DEFAULT_LOG_LEVEL = "DEBUG"
+DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count
 # See https://docs.celeryproject.org/projects/kombu/en/stable/userguide/consumers.html#reference
@@ -86,12 +84,6 @@ class MessageStore(ABC):
     @abstractmethod
     def delete(self, task: StoredTask):
         ...
-
-    def callback(self, _, message):
-        task = StoredTask.from_message(message)
-        logging.debug("Retrieved task: %s", task)
-        self.save(task)
-        message.ack()
 
 
 class FileMessageStore(MessageStore):
@@ -165,9 +157,11 @@ class SqliteMessageStore(MessageStore):
 
     def load_messages(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
         if task_name is None:
+            logging.debug("loading messages")
             cursor = self.execute("SELECT * FROM tasks")
         else:
-            cursor = self.execute("SELECT * FROM tasks WHERE task=?", (task_name,))
+            logging.debug("loading messages with task name: '%s'", task_name)
+            cursor = self.execute("SELECT * FROM tasks WHERE task=?", task_name)
         for row in cursor.fetchall():
             yield StoredTask.from_string(row["json"])
 
@@ -183,7 +177,9 @@ class TaskCounter(Counter):
             termtables.print(self.most_common(), header=["Task", "Count"])
 
 
-def fill(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def fill(
+    queue: Queue, store: MessageStore, routing_key: str, task_name: Optional[str] = None
+) -> None:
     # Uncomment this to fill tasks to a different queue
     # queue = Queue("fill", exchange=_exchange, routing_key=ROUTING_KEY)
     logging.info(f"Filling queue: {queue}")
@@ -192,12 +188,12 @@ def fill(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
         logging.debug("Established connection")
         producer = conn.Producer(serializer="json")
         counter = TaskCounter()
-        for message in counter.stream(store.load_messages(task_name=args.task)):
+        for message in counter.stream(store.load_messages(task_name)):
             logging.debug("Publishing message ID: %s", message.id)
             producer.publish(
                 message.body,
                 exchange=_exchange,
-                routing_key=ROUTING_KEY,
+                routing_key=routing_key,
                 declare=[queue],
                 headers=message.headers,
             )
@@ -205,12 +201,17 @@ def fill(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
         counter.display()
 
 
-def drain(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def drain(queue: Queue, store: MessageStore) -> None:
     logging.info(f"Draining queue: {queue}")
-    # if args.limit:
-    #     store.set_limit(args.limit)
+
+    def callback(_, message):
+        task = StoredTask.from_message(message)
+        logging.debug("Received task: %s", task)
+        store.save(task)
+        message.ack()
+
     with Connection(URL) as conn:
-        with conn.Consumer(queue, callbacks=[store.callback]) as consumer:
+        with conn.Consumer(queue, callbacks=[callback]) as consumer:
             consumer.qos(prefetch_count=CONSUMER_PREFETCH_COUNT)
             try:
                 while True:
@@ -220,13 +221,16 @@ def drain(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
             except KeyboardInterrupt:
                 consumer.recover(requeue=True)
                 raise
+    list_(queue, store, counts=True)
 
 
-def list_(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def list_(
+    queue: Queue, store: MessageStore, counts=False, limit: Optional[int] = None
+) -> None:
     stream = store.load_messages()
-    if args.limit:
-        stream = islice(stream, args.limit)
-    if args.counts:
+    if limit:
+        stream = islice(stream, limit)
+    if counts:
         counter = TaskCounter()
         list(counter.stream(stream))
         counter.display()
@@ -238,6 +242,18 @@ def list_(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
             termtables.print(items, header=["ID", "Task", "Args", "Kwargs"])
 
 
+def drain_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+    drain(queue, store)
+
+
+def fill_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+    fill(queue, store, args.routing_key, args.task)
+
+
+def list_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+    list_(queue, store, args.counts)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -245,6 +261,9 @@ if __name__ == "__main__":
         "--queue",
         default="celery",
         help="Queue to operate on. Defaults to 'celery'",
+    )
+    parser.add_argument(
+        "-k", "--routing-key", default="celery", help="Message routing key"
     )
     parser.add_argument(
         "-s",
@@ -257,26 +276,27 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers()
 
     drain_parser = subparsers.add_parser("drain", help="Drain messages from the queue")
-    drain_parser.add_argument(
-        "-l", "--limit", help="Limit number of tasks retrieved", type=int
-    )
-    drain_parser.set_defaults(func=drain)
+    # drain_parser.add_argument(
+    #     "-l", "--limit", help="Limit number of tasks retrieved", type=int
+    # )
+    drain_parser.set_defaults(func=drain_command)
 
     fill_parser = subparsers.add_parser("fill", help="Put messages back on the queue")
-    fill_parser.set_defaults(func=fill)
+    fill_parser.set_defaults(func=fill_command)
     fill_parser.add_argument(
         "-t",
         "--task",
-        required=False,
         help="Optionally populate the queue with only this type of task",
     )
 
     list_parser = subparsers.add_parser("list", help="Show retrieved messages")
-    list_parser.add_argument("-c", "--counts", help="Display counts for each task type")
+    list_parser.add_argument(
+        "-c", "--counts", help="Display counts for each task type", action="store_true"
+    )
     list_parser.add_argument(
         "-l", "--limit", help="Limit number of rows shown.", type=int
     )
-    list_parser.set_defaults(func=list_)
+    list_parser.set_defaults(func=list_command)
 
     args = parser.parse_args()
 
@@ -284,7 +304,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=log_level)
 
-    queue = Queue(args.queue, exchange=_exchange, routing_key=ROUTING_KEY)
+    queue = Queue(args.queue, exchange=_exchange, routing_key=args.routing_key)
 
     store: MessageStore
     if args.store == "sqlite":
