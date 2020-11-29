@@ -2,7 +2,6 @@ import argparse
 import json
 import logging
 import os
-from re import A
 import socket
 import sqlite3
 import termtables
@@ -10,6 +9,7 @@ from abc import ABC, abstractmethod
 from collections import Counter, deque
 from dataclasses import dataclass
 from itertools import islice
+from pathlib import Path
 from typing import Any, Counter as CounterType, Dict, Iterable, List, Optional
 from uuid import uuid4
 
@@ -88,15 +88,16 @@ class MessageStore(ABC):
 
 class FileMessageStore(MessageStore):
     def __init__(self, directory):
-        self.directory = directory
+        self.path = Path() / directory
+        self.path.mkdir(parents=True, exist_ok=True)
 
     def save(self, task: StoredTask):
-        with open(os.path.join(self.directory, task.id), "w") as f:
+        with open(self.path / task.id, "w") as f:
             f.write(task.json())
 
-    def load_messages(self, task_name=Optional[str]) -> Iterable[StoredTask]:
-        for filename in os.scandir(self.directory):
-            with open(filename) as f:
+    def load_messages(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
+        for path in self.path.glob("*"):
+            with open(path) as f:
                 data = f.read()
                 task = StoredTask.from_string(data)
                 if task_name is None or task.task == task_name:
@@ -104,7 +105,7 @@ class FileMessageStore(MessageStore):
 
     def delete(self, task: StoredTask):
         try:
-            os.remove(os.path.join(self.directory, task.id))
+            os.remove(self.path / task.id)
         except FileNotFoundError:
             pass
 
@@ -225,9 +226,13 @@ def drain(queue: Queue, store: MessageStore) -> None:
 
 
 def list_(
-    queue: Queue, store: MessageStore, counts=False, limit: Optional[int] = None
+    queue: Queue,
+    store: MessageStore,
+    counts=False,
+    limit: Optional[int] = None,
+    task_name: Optional[str] = None,
 ) -> None:
-    stream = store.load_messages()
+    stream = store.load_messages(task_name)
     if limit:
         stream = islice(stream, limit)
     if counts:
@@ -247,11 +252,11 @@ def drain_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -
 
 
 def fill_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
-    fill(queue, store, args.routing_key, args.task)
+    fill(queue, store, args.routing_key, task_name=args.task)
 
 
 def list_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
-    list_(queue, store, args.counts)
+    list_(queue, store, counts=args.counts, task_name=args.task)
 
 
 if __name__ == "__main__":
@@ -296,6 +301,7 @@ if __name__ == "__main__":
     list_parser.add_argument(
         "-l", "--limit", help="Limit number of rows shown.", type=int
     )
+    list_parser.add_argument("-t", "--task", help="List tasks with this name")
     list_parser.set_defaults(func=list_command)
 
     args = parser.parse_args()
