@@ -6,12 +6,11 @@ import socket
 import sqlite3
 import termtables
 from abc import ABC, abstractmethod
-from collections import Counter, deque
+from collections import Counter
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Any, Counter as CounterType, Dict, Iterable, List, Optional
-from uuid import uuid4
+from typing import Any, Dict, Iterable, Optional
 
 from kombu import Connection, Exchange, Message, Queue
 
@@ -24,7 +23,7 @@ EXCHANGE = "default"
 DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count
-# See https://docs.celeryproject.org/projects/kombu/en/stable/userguide/consumers.html#reference
+# See https://docs.celeryproject.org/projects/kombu/en/stable/userguide/consumers.html#reference  # noqa
 CONSUMER_PREFETCH_COUNT = 10
 
 URL = f"amqp://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{VHOST}"
