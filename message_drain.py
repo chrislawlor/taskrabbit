@@ -255,7 +255,7 @@ def fill_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> No
 
 
 def list_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
-    list_(queue, store, counts=args.counts, task_name=args.task)
+    list_(queue, store, counts=args.counts, task_name=args.task, limit=args.limit)
 
 
 if __name__ == "__main__":
