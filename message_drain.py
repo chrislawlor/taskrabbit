@@ -12,14 +12,14 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
-from kombu import Connection, Exchange, Message, Queue
+from kombu import Connection, Message, Queue
 
 USERNAME = "guest"
 PASSWORD = "guest"
 HOST = "rabbit"
 PORT = 5672
 VHOST = "/"
-EXCHANGE = "default"
+EXCHANGE = "taskrabbit"
 DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count
@@ -29,16 +29,21 @@ CONSUMER_PREFETCH_COUNT = 10
 URL = f"amqp://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{VHOST}"
 
 
-_exchange = Exchange(EXCHANGE, "direct", durable=True)
-
-
 @dataclass
 class StoredTask:
     headers: Dict[str, Any]
     body: Any
+    routing_key: str
 
     def json(self):
-        return json.dumps({"headers": self.headers, "body": self.body}, indent=2)
+        return json.dumps(
+            {
+                "headers": self.headers,
+                "body": self.body,
+                "routing_key": self.routing_key,
+            },
+            indent=2,
+        )
 
     @classmethod
     def from_string(cls, string):
@@ -49,7 +54,11 @@ class StoredTask:
     def from_message(cls, message: Message):
         # Kombu docs say message.body is a str, but it's really a memoryview,
         # which is not JSON serializable
-        return cls(body=message.decode(), headers=message.headers)
+        return cls(
+            body=message.decode(),
+            headers=message.headers,
+            routing_key=message.delivery_info["routing_key"],
+        )
 
     @property
     def id(self):
@@ -177,12 +186,10 @@ class TaskCounter(Counter):
             termtables.print(self.most_common(), header=["Task", "Count"])
 
 
-def fill(
-    queue: Queue, store: TaskStore, routing_key: str, task_name: Optional[str] = None
-) -> None:
+def fill(exchange: str, store: TaskStore, task_name: Optional[str] = None) -> None:
     # Uncomment this to fill tasks to a different queue
     # queue = Queue("fill", exchange=_exchange, routing_key=ROUTING_KEY)
-    logging.info(f"Filling queue: {queue}")
+    # logging.info(f"Filling queue: {queue}")
 
     with Connection(URL) as conn:
         logging.debug("Established connection")
@@ -192,9 +199,8 @@ def fill(
             logging.debug("Publishing task ID: %s", task.id)
             producer.publish(
                 task.body,
-                exchange=_exchange,
-                routing_key=routing_key,
-                declare=[queue],
+                exchange=exchange,
+                routing_key=task.routing_key,
                 headers=task.headers,
             )
             store.delete(task)
@@ -221,11 +227,10 @@ def drain(queue: Queue, store: TaskStore) -> None:
             except KeyboardInterrupt:
                 consumer.recover(requeue=True)
                 raise
-    list_(queue, store, counts=True)
+    list_(store, counts=True)
 
 
 def list_(
-    queue: Queue,
     store: TaskStore,
     counts=False,
     limit: Optional[int] = None,
@@ -246,28 +251,36 @@ def list_(
             termtables.print(items, header=["ID", "Task", "Args", "Kwargs"])
 
 
-def drain_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
+def init_store(args: argparse.Namespace) -> TaskStore:
+    if args.store == "sqlite":
+        return SqliteTaskStore("tasks.sqlite")
+    return FileTaskStore("tasks")
+
+
+def drain_command(args: argparse.Namespace) -> None:
+    store = init_store(args)
+    queue = Queue(args.queue, exchange=args.exchange)
     drain(queue, store)
 
 
-def fill_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
-    fill(queue, store, args.routing_key, task_name=args.task)
+def fill_command(args: argparse.Namespace) -> None:
+    store = init_store(args)
+    fill(args.exchange, store, task_name=args.task)
 
 
-def list_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
-    list_(queue, store, counts=args.counts, task_name=args.task, limit=args.limit)
+def list_command(args: argparse.Namespace) -> None:
+    store = init_store(args)
+    list_(store, counts=args.counts, task_name=args.task, limit=args.limit)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("-x", "--exchange", default="celery")
     parser.add_argument(
         "-q",
         "--queue",
         default="celery",
         help="Queue to operate on. Defaults to 'celery'",
-    )
-    parser.add_argument(
-        "-k", "--routing-key", default="celery", help="Message routing key"
     )
     parser.add_argument(
         "-s",
@@ -307,16 +320,8 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=log_level)
 
-    queue = Queue(args.queue, exchange=_exchange, routing_key=args.routing_key)
-
-    store: TaskStore
-    if args.store == "sqlite":
-        store = SqliteTaskStore("tasks.sqlite")
-    else:
-        store = FileTaskStore("tasks")
-
     try:
-        args.func(queue, store, args)
+        args.func(args)
     except AttributeError:
         # Didn't pass a subcommand
         parser.print_help()
