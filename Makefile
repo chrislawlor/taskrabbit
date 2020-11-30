@@ -1,3 +1,5 @@
+.PHONY: tasks
+
 run: clear-messages tasks drain fill worker
 
 build:
