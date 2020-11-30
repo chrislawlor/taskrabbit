@@ -71,13 +71,13 @@ class StoredTask:
         return f"<StoredTask {self.task}: {self.id}>"
 
 
-class MessageStore(ABC):
+class TaskStore(ABC):
     @abstractmethod
     def save(self, task: StoredTask):
         ...
 
     @abstractmethod
-    def load_messages(self, task_name=Optional[str]) -> Iterable[StoredTask]:
+    def load_tasks(self, task_name=Optional[str]) -> Iterable[StoredTask]:
         ...
 
     @abstractmethod
@@ -85,7 +85,7 @@ class MessageStore(ABC):
         ...
 
 
-class FileMessageStore(MessageStore):
+class FileTaskStore(TaskStore):
     def __init__(self, directory):
         self.path = Path() / directory
         self.path.mkdir(parents=True, exist_ok=True)
@@ -94,7 +94,7 @@ class FileMessageStore(MessageStore):
         with open(self.path / task.id, "w") as f:
             f.write(task.json())
 
-    def load_messages(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
+    def load_tasks(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
         for path in self.path.glob("*"):
             with open(path) as f:
                 data = f.read()
@@ -109,7 +109,7 @@ class FileMessageStore(MessageStore):
             pass
 
 
-class SqliteMessageStore(MessageStore):
+class SqliteTaskStore(TaskStore):
     def __init__(self, dbname="tasks.sqlite"):
         super().__init__()
         self.conn = sqlite3.connect(dbname)
@@ -155,12 +155,12 @@ class SqliteMessageStore(MessageStore):
             task.id,
         )
 
-    def load_messages(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
+    def load_tasks(self, task_name: Optional[str] = None) -> Iterable[StoredTask]:
         if task_name is None:
-            logging.debug("loading messages")
+            logging.debug("loading tasks")
             cursor = self.execute("SELECT * FROM tasks")
         else:
-            logging.debug("loading messages with task name: '%s'", task_name)
+            logging.debug("loading tasks with task name: '%s'", task_name)
             cursor = self.execute("SELECT * FROM tasks WHERE task=?", task_name)
         for row in cursor.fetchall():
             yield StoredTask.from_string(row["json"])
@@ -178,7 +178,7 @@ class TaskCounter(Counter):
 
 
 def fill(
-    queue: Queue, store: MessageStore, routing_key: str, task_name: Optional[str] = None
+    queue: Queue, store: TaskStore, routing_key: str, task_name: Optional[str] = None
 ) -> None:
     # Uncomment this to fill tasks to a different queue
     # queue = Queue("fill", exchange=_exchange, routing_key=ROUTING_KEY)
@@ -188,23 +188,23 @@ def fill(
         logging.debug("Established connection")
         producer = conn.Producer(serializer="json")
         counter = TaskCounter()
-        for message in counter.stream(store.load_messages(task_name)):
-            logging.debug("Publishing message ID: %s", message.id)
+        for task in counter.stream(store.load_tasks(task_name)):
+            logging.debug("Publishing task ID: %s", task.id)
             producer.publish(
-                message.body,
+                task.body,
                 exchange=_exchange,
                 routing_key=routing_key,
                 declare=[queue],
-                headers=message.headers,
+                headers=task.headers,
             )
-            store.delete(message)
+            store.delete(task)
         counter.display()
 
 
-def drain(queue: Queue, store: MessageStore) -> None:
+def drain(queue: Queue, store: TaskStore) -> None:
     logging.info(f"Draining queue: {queue}")
 
-    def callback(_, message):
+    def callback(_, message: Message):
         task = StoredTask.from_message(message)
         logging.debug("Received task: %s", task)
         store.save(task)
@@ -226,12 +226,12 @@ def drain(queue: Queue, store: MessageStore) -> None:
 
 def list_(
     queue: Queue,
-    store: MessageStore,
+    store: TaskStore,
     counts=False,
     limit: Optional[int] = None,
     task_name: Optional[str] = None,
 ) -> None:
-    stream = store.load_messages(task_name)
+    stream = store.load_tasks(task_name)
     if limit:
         stream = islice(stream, limit)
     if counts:
@@ -246,15 +246,15 @@ def list_(
             termtables.print(items, header=["ID", "Task", "Args", "Kwargs"])
 
 
-def drain_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def drain_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
     drain(queue, store)
 
 
-def fill_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def fill_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
     fill(queue, store, args.routing_key, task_name=args.task)
 
 
-def list_command(queue: Queue, store: MessageStore, args: argparse.Namespace) -> None:
+def list_command(queue: Queue, store: TaskStore, args: argparse.Namespace) -> None:
     list_(queue, store, counts=args.counts, task_name=args.task)
 
 
@@ -274,26 +274,24 @@ if __name__ == "__main__":
         "--store",
         choices=("file", "sqlite"),
         default="sqlite",
-        help="Message storage option",
+        help="Task storage option",
     )
     parser.add_argument("-L", "--log-level", default=DEFAULT_LOG_LEVEL)
     subparsers = parser.add_subparsers()
 
-    drain_parser = subparsers.add_parser("drain", help="Drain messages from the queue")
+    drain_parser = subparsers.add_parser("drain", help="Drain tasks from the queue")
     # drain_parser.add_argument(
     #     "-l", "--limit", help="Limit number of tasks retrieved", type=int
     # )
     drain_parser.set_defaults(func=drain_command)
 
-    fill_parser = subparsers.add_parser("fill", help="Put messages back on the queue")
+    fill_parser = subparsers.add_parser("fill", help="Put tasks back on the queue")
     fill_parser.set_defaults(func=fill_command)
     fill_parser.add_argument(
-        "-t",
-        "--task",
-        help="Optionally populate the queue with only this type of task",
+        "-t", "--task", help="Optionally populate the queue with only this type of task"
     )
 
-    list_parser = subparsers.add_parser("list", help="Show retrieved messages")
+    list_parser = subparsers.add_parser("list", help="Show retrieved tasks")
     list_parser.add_argument(
         "-c", "--counts", help="Display counts for each task type", action="store_true"
     )
@@ -311,10 +309,14 @@ if __name__ == "__main__":
 
     queue = Queue(args.queue, exchange=_exchange, routing_key=args.routing_key)
 
-    store: MessageStore
+    store: TaskStore
     if args.store == "sqlite":
-        store = SqliteMessageStore("tasks.sqlite")
+        store = SqliteTaskStore("tasks.sqlite")
     else:
-        store = FileMessageStore("messages")
+        store = FileTaskStore("tasks")
 
-    args.func(queue, store, args)
+    try:
+        args.func(queue, store, args)
+    except AttributeError:
+        # Didn't pass a subcommand
+        parser.print_help()
