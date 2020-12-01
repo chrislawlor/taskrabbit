@@ -34,9 +34,9 @@ Docker is required to run this example. We assume a posix environment.
 1. Now the fun starts. Let's drain the queue to local file storage:
 
    ```
-   $ taskr --queue celery --store file drain
+   $ taskr --queue arithmetic --store file drain
 
-   INFO:root:Draining queue: <unbound Queue celery -> <unbound Exchange default(direct)> -> celery>
+   INFO:root:Draining queue: <unbound Queue arithmetic -> <unbound Exchange default(direct)> -> arithmetic>
    ┌────────────────┬───────┐
    │ Task           │ Count │
    ╞════════════════╪═══════╡
@@ -45,8 +45,6 @@ Docker is required to run this example. We assume a posix environment.
    │ tasks.add      │ 30    │
    └────────────────┴───────┘
    ```
-
-   Taskrabbit's output actually looks nice in the terminal, but currently does not copy/paste very well.
 
    The `--store file` option specifies to use the local filesystem to store tasks.
 
@@ -106,7 +104,8 @@ Docker is required to run this example. We assume a posix environment.
           "chain": null,
           "chord": null
         }
-      ]
+      ],
+      "routing_key": "arithmetic.#"
     }
    ```
 
@@ -134,10 +133,11 @@ Docker is required to run this example. We assume a posix environment.
    └──────────────────────────────────────┴────────────────┴──────────┴────────┘
    ```
 
-1. When we're ready, put the tasks back on the queue. Let's queue the add tasks first:
+1. When we're ready, put the tasks back on their respective queues. We do this by publishing
+   them to an exchange. Let's queue the add tasks first:
 
    ```
-   $ taskr --store file fill --task tasks.add
+   $ taskr --store file --exchange tasks fill --task tasks.add
 
    ┌───────────┬───────┐
    │ Task      │ Count │
@@ -161,7 +161,7 @@ Docker is required to run this example. We assume a posix environment.
 1. Let's put all the remaining tasks back on the queue:
 
    ```
-   $ taskr --store file fill
+   $ taskr --store file --exchange tasks fill
 
    ┌────────────────┬───────┐
    │ Task           │ Count │
