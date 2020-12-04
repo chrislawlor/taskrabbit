@@ -139,6 +139,7 @@ cython_debug/
 
 # Misc
 *.sqlite
+*.sqlite-journal
 
 # IDE
 .vscode/

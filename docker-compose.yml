@@ -2,7 +2,7 @@ version: "3"
 
 services:
   app:
-    image: message_drain
+    image: taskrabbit
     volumes:
       - ./:/home/docker
 

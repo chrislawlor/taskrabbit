@@ -1,10 +1,10 @@
 .PHONY: tasks
 
-run: clear-messages tasks drain fill worker
-
 build:
 	DOCKER_BUILDKIT=1 \
-	docker build -t message_drain .
+	docker build -t taskrabbit .
+
+run: clear-messages tasks drain fill worker
 
 clear-messages:
 	rm -rf messages/*
@@ -19,13 +19,13 @@ worker-shell:
 	docker-compose run --rm worker bash
 
 drain:
-	docker-compose run --rm app python message_drain.py drain --limit 10
+	docker-compose run --rm app python -m taskrabbit -q arithmetic drain
 
 fill:
-	docker-compose run --rm app python message_drain.py fill
+	docker-compose run --rm app python -m taskrabbit -x tasks fill
 
 list:
-	docker-compose run --rm app python message_drain.py list
+	docker-compose run --rm app python -m taskrabbit list -c
 
 worker:
 	docker-compose up worker
