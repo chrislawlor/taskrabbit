@@ -12,11 +12,21 @@ class SqliteTaskStore(TaskStore):
         self.conn.row_factory = sqlite3.Row
         self.create_table()
 
+        # execute many writes 1000x faster by not waiting for
+        # each transaction to go to disk.
+        # See https://www.sqlite.org/faq.html#q19
+        self.execute("PRAGMA synchronous=OFF")
+
     def create_table(self):
         self.execute(
             """
-        CREATE TABLE IF NOT EXISTS tasks
-        (id text, task text, args text, kwargs text, json text)
+        CREATE TABLE IF NOT EXISTS tasks (
+            id text UNIQUE NOT NULL
+            , task text
+            , args text
+            , kwargs text
+            , json text
+        )
         """
         )
 
@@ -34,7 +44,8 @@ class SqliteTaskStore(TaskStore):
             """
         INSERT INTO tasks
         VALUES
-        (?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO NOTHING
         """,
             task.id,
             task.task,

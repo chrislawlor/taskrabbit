@@ -8,6 +8,6 @@ DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count
 # See https://docs.celeryproject.org/projects/kombu/en/stable/userguide/consumers.html#reference  # noqa
-CONSUMER_PREFETCH_COUNT = 10
+CONSUMER_PREFETCH_COUNT = 500
 
 URL = f"amqp://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{VHOST}"
