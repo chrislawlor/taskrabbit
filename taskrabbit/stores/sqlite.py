@@ -2,13 +2,14 @@ import logging
 import sqlite3
 from typing import Iterable, Optional
 
+from taskrabbit.config import SqliteConfig
 from .base import TaskStore, StoredTask
 
 
 class SqliteTaskStore(TaskStore):
-    def __init__(self, dbname="tasks.sqlite"):
+    def __init__(self, cfg: SqliteConfig):
         super().__init__()
-        self.conn = sqlite3.connect(dbname)
+        self.conn = sqlite3.connect(cfg.db)
         self.conn.row_factory = sqlite3.Row
         self.create_table()
 

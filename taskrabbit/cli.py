@@ -7,52 +7,46 @@ from .operations import drain, fill, list_
 from .stores.base import TaskStore
 
 
-def init_store(args: argparse.Namespace) -> TaskStore:
-    if args.store == "sqlite":
+def init_store(cfg: config.Config) -> TaskStore:
+    if cfg.store.name == "sqlite":
         from .stores.sqlite import SqliteTaskStore
 
-        return SqliteTaskStore("tasks.sqlite")
-    if args.store == "postgres":
+        return SqliteTaskStore(cfg.store)
+    if cfg.store.name == "postgres":
         from .stores.postgres import PostgresTaskStore
 
-        return PostgresTaskStore()
+        return PostgresTaskStore(cfg.store)
     from .stores.file import FileTaskStore
 
-    return FileTaskStore("tasks")
+    return FileTaskStore(cfg.store)
 
 
-def drain_command(args: argparse.Namespace) -> None:
-    store = init_store(args)
+def drain_command(cfg: config.Config, args: argparse.Namespace) -> None:
+    store = init_store(cfg)
     drain(args.exchange, args.queue, store)
     print("Stored tasks:")
     list_(store, counts=True)
 
 
-def fill_command(args: argparse.Namespace) -> None:
-    store = init_store(args)
+def fill_command(cfg: config.Config, args: argparse.Namespace) -> None:
+    store = init_store(cfg)
     fill(args.exchange, store, task_name=args.task)
 
 
-def list_command(args: argparse.Namespace) -> None:
-    store = init_store(args)
+def list_command(cfg: config.Config, args: argparse.Namespace) -> None:
+    store = init_store(cfg)
     list_(store, counts=args.counts, task_name=args.task, limit=args.limit)
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", default="taskrabbit.ini")
     parser.add_argument("-x", "--exchange", default="celery")
     parser.add_argument(
         "-q",
         "--queue",
         default="celery",
         help="Queue to operate on. Defaults to 'celery'",
-    )
-    parser.add_argument(
-        "-s",
-        "--store",
-        choices=("file", "sqlite", "postgres"),
-        default="sqlite",
-        help="Task storage option",
     )
     parser.add_argument("-L", "--log-level", default=config.DEFAULT_LOG_LEVEL)
     subparsers = parser.add_subparsers()
@@ -81,12 +75,14 @@ def main():
 
     args = parser.parse_args()
 
-    log_level = getattr(logging, args.log_level.upper(), config.DEFAULT_LOG_LEVEL)
+    cfg = config.load_config(args.config, taskrabbit={"log_level": args.log_level})
+
+    log_level = getattr(logging, cfg.log_level, config.DEFAULT_LOG_LEVEL)
 
     logging.basicConfig(level=log_level)
 
     try:
-        args.func(args)
+        args.func(cfg, args)
     except AttributeError:
         # Didn't pass a subcommand
         parser.print_help()

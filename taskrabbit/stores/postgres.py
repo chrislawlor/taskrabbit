@@ -3,15 +3,13 @@ from typing import Iterable, Optional
 
 import psycopg2 as pg
 
+from taskrabbit.config import PostgresConfig
 from .base import StoredTask, TaskStore
-
-# TODO: configuration
-DSN = "postgresql://taskrabbit:password@localhost:5432/taskrabbit"
 
 
 class PostgresTaskStore(TaskStore):
-    def __init__(self):
-        self.conn = pg.connect(dsn=DSN)
+    def __init__(self, cfg: PostgresConfig):
+        self.conn = pg.connect(dsn=cfg.get_dsn())
         self.create_table()
 
     def create_table(self):

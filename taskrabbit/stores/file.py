@@ -2,12 +2,13 @@ import os
 from pathlib import Path
 from typing import Iterable, Optional
 
+from taskrabbit.config import FileConfig
 from .base import TaskStore, StoredTask
 
 
 class FileTaskStore(TaskStore):
-    def __init__(self, directory):
-        self.path = Path() / directory
+    def __init__(self, cfg: FileConfig):
+        self.path = Path() / cfg.directory
         self.path.mkdir(parents=True, exist_ok=True)
 
     def save(self, task: StoredTask):
