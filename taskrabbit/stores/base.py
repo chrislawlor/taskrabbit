@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from kombu import Message
 
@@ -11,6 +11,8 @@ class StoredTask:
     headers: Dict[str, Any]
     body: Any
     routing_key: str
+    # args: List[Any]
+    # kwargs: Dict[str, Any]
 
     def json(self):
         return json.dumps(
@@ -35,6 +37,8 @@ class StoredTask:
             body=message.decode(),
             headers=message.headers,
             routing_key=message.delivery_info["routing_key"],
+            # args=message.payload[0],
+            # kwargs=message.payload[1],
         )
 
     @property

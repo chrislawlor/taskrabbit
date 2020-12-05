@@ -1,9 +1,9 @@
 USERNAME = "guest"
 PASSWORD = "guest"
-HOST = "rabbit"
+HOST = "localhost"
 PORT = 5672
 VHOST = "/"
-EXCHANGE = "taskrabbit"
+# EXCHANGE = "taskrabbit"
 DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count

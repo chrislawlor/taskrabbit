@@ -2,7 +2,7 @@ import logging
 import socket
 from collections import Counter
 from itertools import islice
-from typing import Optional, Iterable
+from typing import List, Optional, Iterable
 import termtables
 from kombu import Connection, Message, Queue
 
@@ -46,23 +46,35 @@ def drain(exchange_name: str, queue_name: str, store: TaskStore) -> None:
     queue = Queue(queue_name, exchange=exchange_name)
     logging.info(f"Draining queue: {queue}")
 
+    requeue: List[Message] = []
+
     def callback(_, message: Message):
+        nonlocal requeue
         task = StoredTask.from_message(message)
         logging.debug("Received task: %s", task)
-        store.save(task)
-        message.ack()
+        try:
+            store.save(task)
+            message.ack()
+        except Exception:
+            requeue.append(message)
 
+    # TODO: Safer persistence for messages that need to be requeued.
     with Connection(config.URL) as conn:
-        with conn.Consumer(queue, callbacks=[callback]) as consumer:
-            consumer.qos(prefetch_count=config.CONSUMER_PREFETCH_COUNT)
-            try:
-                while True:
-                    conn.drain_events(timeout=1)
-            except socket.timeout:
-                pass
-            except KeyboardInterrupt:
-                consumer.recover(requeue=True)
-                raise
+        try:
+            with conn.Consumer(queue, callbacks=[callback]) as consumer:
+                consumer.qos(prefetch_count=config.CONSUMER_PREFETCH_COUNT)
+                try:
+                    while True:
+                        conn.drain_events(timeout=1)
+                except socket.timeout:
+                    pass
+                except KeyboardInterrupt:
+                    consumer.recover(requeue=True)
+                    raise
+        finally:
+            if requeue:
+                for message in requeue:
+                    message.requeue()
 
 
 def list_(

@@ -37,6 +37,7 @@ class SqliteTaskStore(TaskStore):
             self.conn.commit()
         except Exception as e:
             logging.exception(e)
+            raise
         return c
 
     def save(self, task: StoredTask):

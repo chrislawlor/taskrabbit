@@ -22,3 +22,14 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: taskrabbit
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+
+volumes:
+  .postgres_data:

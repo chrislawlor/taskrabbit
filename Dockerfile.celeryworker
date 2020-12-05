@@ -6,7 +6,7 @@ RUN python -m pip install --upgrade pip
 
 WORKDIR /home/docker
 
-COPY requirements.txt .
+# COPY requirements/ requirements/
 RUN python -m pip install celery==4.4.7
 
 COPY celeryapp .

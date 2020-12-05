@@ -1,16 +1,23 @@
 import argparse
 import logging
+from taskrabbit.stores.postgres import PostgresTaskStore
 
 from . import config
 from .operations import drain, fill, list_
 from .stores.base import TaskStore
-from .stores.sqlite import SqliteTaskStore
-from .stores.file import FileTaskStore
 
 
 def init_store(args: argparse.Namespace) -> TaskStore:
     if args.store == "sqlite":
+        from .stores.sqlite import SqliteTaskStore
+
         return SqliteTaskStore("tasks.sqlite")
+    if args.store == "postgres":
+        from .stores.postgres import PostgresTaskStore
+
+        return PostgresTaskStore()
+    from .stores.file import FileTaskStore
+
     return FileTaskStore("tasks")
 
 
@@ -43,7 +50,7 @@ def main():
     parser.add_argument(
         "-s",
         "--store",
-        choices=("file", "sqlite"),
+        choices=("file", "sqlite", "postgres"),
         default="sqlite",
         help="Task storage option",
     )
