@@ -10,8 +10,8 @@ WORKDIR /home/docker
 
 FROM base
 
-COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements.txt
+COPY requirements/ requirements/
+RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements/base.txt
 
 COPY taskrabbit .
 

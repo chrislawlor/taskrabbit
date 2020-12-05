@@ -17,6 +17,8 @@ def init_store(args: argparse.Namespace) -> TaskStore:
 def drain_command(args: argparse.Namespace) -> None:
     store = init_store(args)
     drain(args.exchange, args.queue, store)
+    print("Stored tasks:")
+    list_(store, counts=True)
 
 
 def fill_command(args: argparse.Namespace) -> None:

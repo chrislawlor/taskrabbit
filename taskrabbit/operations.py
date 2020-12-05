@@ -63,7 +63,6 @@ def drain(exchange_name: str, queue_name: str, store: TaskStore) -> None:
             except KeyboardInterrupt:
                 consumer.recover(requeue=True)
                 raise
-    list_(store, counts=True)
 
 
 def list_(
