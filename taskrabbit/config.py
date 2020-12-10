@@ -1,8 +1,8 @@
-import os
+import configparser
+
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import ConfigurationSet, config_from_env, config_from_dict, config_from_path
 
 USERNAME = "guest"
 PASSWORD = "guest"
@@ -28,15 +28,10 @@ DEFAULTS = {
         "port": "5672",
         "vhost": "/",
     },
-    "sqlite": {
-        "db": "tasks.sqlite",
-    },
+    "sqlite": {"db": "tasks.sqlite"},
 }
 
-CONFIG_PATHS = [
-    Path.home() / ".taskrabbit.ini",
-    Path("taskrabbit.ini"),
-]
+CONFIG_PATHS = [Path.home() / ".taskrabbit.ini", Path("taskrabbit.ini")]
 
 
 @dataclass
@@ -48,7 +43,10 @@ class RabbitMQConfig:
     vhost: str = "/"
 
     def url(self):
-        return f"amqp://{self.username}:{self.password}@{self.host}:{self.port}/{self.vhost}"
+        return (
+            f"amqp://{self.username}:{self.password}@"
+            f"{self.host}:{self.port}/{self.vhost}"
+        )
 
 
 class StoreConfig:
@@ -64,21 +62,24 @@ class Config:
 
 @dataclass
 class SqliteConfig(StoreConfig):
-    name = "sqlite"
     db: str
+    name: str = "sqlite"
 
 
 @dataclass
 class PostgresConfig(StoreConfig):
-    name = "postgres"
     username: str
     password: str
     host: str
     port: str
     db: str
+    name: str = "postgres"
 
     def get_dsn(self):
-        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.db}"
+        return (
+            f"postgresql://{self.username}:{self.password}@"
+            f"{self.host}:{self.port}/{self.db}"
+        )
 
 
 @dataclass
@@ -87,26 +88,32 @@ class FileConfig(StoreConfig):
     directory = "tasks"
 
 
-STORE_CONFIG_MAP = {
-    "sqlite": SqliteConfig,
-    "postgres": PostgresConfig,
-}
+STORE_CONFIG_MAP = {"sqlite": SqliteConfig, "postgres": PostgresConfig}
 
 
-def load_config(config_file, **opts):
-    config_paths = list(
-        filter(
-            lambda p: p.exists(), [Path(config_file), Path.home() / ".taskrabbit.ini"]
-        )
-    )
+def _update_config(config, options):
+    for k, v in config.items():
+        if k in options:
+            if hasattr(v, "items"):
+                _update_config(config[k], options[k])
+            else:
+                config[k] = options[k]
 
-    config_set = ConfigurationSet(
-        config_from_dict(opts),
-        *map(config_from_path, config_paths),
-        config_from_dict(DEFAULTS),
-    )
-    store_type = config_set.pop("taskrabbit.store")
+
+def load_config(*paths: Path, **opts):
+    config_paths = list(filter(lambda p: p.exists(), paths))
+
+    cfg = configparser.ConfigParser()
+
+    for path in config_paths:
+        cfg.read(path)
+
+    _update_config(cfg, opts)
+
+    store_type = cfg["taskrabbit"]["store"]
+    del cfg["taskrabbit"]["store"]
     store_cls = STORE_CONFIG_MAP[store_type]
-    store_cfg = store_cls(**config_set.pop(store_type))
-    rabbit_cfg = RabbitMQConfig(**config_set.pop("rabbitmq"))
-    return Config(rabbitmq=rabbit_cfg, store=store_cfg, **config_set["taskrabbit"])
+    store_cfg = store_cls(**cfg[store_type])
+    rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
+    cfg = Config(rabbitmq=rabbit_cfg, store=store_cfg, **cfg["taskrabbit"])
+    return cfg

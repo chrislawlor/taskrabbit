@@ -1,10 +1,12 @@
 import argparse
 import logging
-from taskrabbit.stores.postgres import PostgresTaskStore
+from pathlib import Path
 
 from . import config
 from .operations import drain, fill, list_
 from .stores.base import TaskStore
+
+HOME_CONFIG_PATH = Path.home() / ".taskrabbit.ini"
 
 
 def init_store(cfg: config.Config) -> TaskStore:
@@ -75,11 +77,16 @@ def main():
 
     args = parser.parse_args()
 
-    cfg = config.load_config(args.config, taskrabbit={"log_level": args.log_level})
+    cfg = config.load_config(
+        HOME_CONFIG_PATH,
+        Path(args.config).absolute(),
+        taskrabbit={"log_level": args.log_level.upper()},
+    )
 
-    log_level = getattr(logging, cfg.log_level, config.DEFAULT_LOG_LEVEL)
+    log_level = getattr(logging, cfg.log_level)
 
     logging.basicConfig(level=log_level)
+    logging.debug("Loaded configuration: %s", cfg)
 
     try:
         args.func(cfg, args)
