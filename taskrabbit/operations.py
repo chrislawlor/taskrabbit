@@ -4,7 +4,8 @@ from collections import Counter
 from itertools import islice
 from typing import List, Optional, Iterable
 import termtables
-from kombu import Connection, Message, Queue
+from kombu import Connection, Exchange, Message, Queue
+from amqp.exceptions import NotFound as AMQPNotFound
 
 from . import config
 from .stores.base import StoredTask, TaskStore
@@ -21,25 +22,31 @@ class TaskCounter(Counter):
             termtables.print(self.most_common(), header=["Task", "Count"])
 
 
-def fill(exchange: str, store: TaskStore, task_name: Optional[str] = None) -> None:
-    # Uncomment this to fill tasks to a different queue
-    # queue = Queue("fill", exchange=_exchange, routing_key=ROUTING_KEY)
-    # logging.info(f"Filling queue: {queue}")
+def fill(exchange_name: str, store: TaskStore, task_name: Optional[str] = None) -> None:
 
     with Connection(config.URL) as conn:
-        logging.debug("Established connection")
-        producer = conn.Producer(serializer="json")
-        counter = TaskCounter()
-        for task in counter.stream(store.load_tasks(task_name)):
-            logging.debug("Publishing task ID: %s", task.id)
-            producer.publish(
-                task.body,
-                exchange=exchange,
-                routing_key=task.routing_key,
-                headers=task.headers,
-            )
-            store.delete(task)
-        counter.display()
+        with conn.channel() as channel:
+            try:
+                counter = TaskCounter()
+                # Passively declare the exchange so we can fail if it doesn't
+                # already exist.
+                exchange = Exchange(exchange_name, channel=channel, passive=True)
+                logging.debug("Established connection")
+                producer = conn.Producer(
+                    exchange=exchange, channel=channel, serializer="json"
+                )
+                for task in counter.stream(store.load_tasks(task_name)):
+                    logging.debug("Publishing task ID: %s", task.id)
+                    producer.publish(
+                        task.body,
+                        exchange=exchange,
+                        routing_key=task.routing_key,
+                        headers=task.headers,
+                    )
+                    store.delete(task)
+                counter.display()
+            except AMQPNotFound as ex:
+                logging.error(str(ex))
 
 
 def drain(queue_name: str, store: TaskStore) -> None:
