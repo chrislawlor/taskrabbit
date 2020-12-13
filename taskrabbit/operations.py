@@ -22,12 +22,17 @@ class TaskCounter(Counter):
             termtables.print(self.most_common(), header=["Task", "Count"])
 
 
-def fill(exchange_name: str, store: TaskStore, task_name: Optional[str] = None) -> None:
+def fill(
+    cfg: config.Config,
+    exchange_name: str,
+    store: TaskStore,
+    task_name: Optional[str] = None,
+) -> None:
     # Don't publish to system exchanges
     if exchange_name.startswith("amq"):
         raise ValueError(f"Cannot publish to system exchange: {exchange_name}")
 
-    with Connection(config.URL) as conn:
+    with Connection(cfg.rabbitmq.url()) as conn:
         with conn.channel() as channel:
             try:
                 counter = TaskCounter()
@@ -52,7 +57,7 @@ def fill(exchange_name: str, store: TaskStore, task_name: Optional[str] = None) 
                 logging.error(str(ex))
 
 
-def drain(queue_name: str, store: TaskStore) -> None:
+def drain(cfg: config.Config, queue_name: str, store: TaskStore) -> None:
     queue = Queue(queue_name)
     logging.info(f"Draining queue: {queue}")
 
@@ -69,7 +74,7 @@ def drain(queue_name: str, store: TaskStore) -> None:
             requeue.append(message)
 
     # TODO: Safer persistence for messages that need to be requeued.
-    with Connection(config.URL) as conn:
+    with Connection(cfg.rabbitmq.url()) as conn:
         try:
             with conn.Consumer(queue, callbacks=[callback]) as consumer:
                 consumer.qos(prefetch_count=config.CONSUMER_PREFETCH_COUNT)

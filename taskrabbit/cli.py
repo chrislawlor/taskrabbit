@@ -26,14 +26,14 @@ def init_store(cfg: config.Config) -> TaskStore:
 
 def drain_command(cfg: config.Config, args: argparse.Namespace) -> None:
     store = init_store(cfg)
-    drain(args.queue, store)
+    drain(cfg, args.queue, store)
     print("Stored tasks:")
     list_(store, counts=True)
 
 
 def fill_command(cfg: config.Config, args: argparse.Namespace) -> None:
     store = init_store(cfg)
-    fill(args.exchange, store, task_name=args.task)
+    fill(cfg, args.exchange, store, task_name=args.task)
 
 
 def list_command(cfg: config.Config, args: argparse.Namespace) -> None:
