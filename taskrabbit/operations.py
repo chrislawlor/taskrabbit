@@ -23,6 +23,9 @@ class TaskCounter(Counter):
 
 
 def fill(exchange_name: str, store: TaskStore, task_name: Optional[str] = None) -> None:
+    # Don't publish to system exchanges
+    if exchange_name.startswith("amq"):
+        raise ValueError(f"Cannot publish to system exchange: {exchange_name}")
 
     with Connection(config.URL) as conn:
         with conn.channel() as channel:
