@@ -43,17 +43,18 @@ def list_command(cfg: config.Config, args: argparse.Namespace) -> None:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", default="taskrabbit.ini")
-    parser.add_argument("-x", "--exchange", default="celery")
-    parser.add_argument(
-        "-q",
-        "--queue",
-        default="celery",
-        help="Queue to operate on. Defaults to 'celery'",
-    )
+
     parser.add_argument("-L", "--log-level", default=config.DEFAULT_LOG_LEVEL)
+    parser.add_argument(
+        "-x", "--exchange", default="celery", help="Publish tasks to this exchange"
+    )
     subparsers = parser.add_subparsers()
 
     drain_parser = subparsers.add_parser("drain", help="Drain tasks from the queue")
+    drain_parser.add_argument(
+        "queue",
+        help="Queue to drain tasks from.",
+    )
     # drain_parser.add_argument(
     #     "-l", "--limit", help="Limit number of tasks retrieved", type=int
     # )
@@ -90,6 +91,7 @@ def main():
 
     try:
         args.func(cfg, args)
-    except AttributeError:
+    except AttributeError as e:
+        logging.debug(str(e))
         # Didn't pass a subcommand
         parser.print_help()
