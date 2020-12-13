@@ -77,7 +77,9 @@ def drain(cfg: config.Config, queue_name: str, store: TaskStore) -> None:
     with Connection(cfg.rabbitmq.url()) as conn:
         try:
             with conn.Consumer(queue, callbacks=[callback]) as consumer:
-                consumer.qos(prefetch_count=config.CONSUMER_PREFETCH_COUNT)
+                consumer.qos(
+                    prefetch_count=config.RabbitMQConfig.consumer_prefetch_count
+                )
                 try:
                     while True:
                         conn.drain_events(timeout=1)

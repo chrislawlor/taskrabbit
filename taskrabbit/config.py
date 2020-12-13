@@ -8,7 +8,7 @@ DEFAULT_LOG_LEVEL = "INFO"
 
 # Sets kombu Consumer prefetch count
 # See https://docs.celeryproject.org/projects/kombu/en/stable/userguide/consumers.html#reference  # noqa
-CONSUMER_PREFETCH_COUNT = 500
+DEFAULT_CONSUMER_PREFETCH_COUNT = 100
 
 
 DEFAULTS = {
@@ -26,13 +26,14 @@ DEFAULTS = {
 CONFIG_PATHS = [Path.home() / ".taskrabbit.ini", Path("taskrabbit.ini")]
 
 
-@dataclass
+@dataclass(frozen=True)
 class RabbitMQConfig:
     username: str
     password: str
     host: str
     port: str = "5672"
     vhost: str = "/"
+    consumer_prefetch_count: int = DEFAULT_CONSUMER_PREFETCH_COUNT
 
     def url(self):
         return (
@@ -52,13 +53,13 @@ class Config:
     rabbitmq: RabbitMQConfig
 
 
-@dataclass
+@dataclass(frozen=True)
 class SqliteConfig(StoreConfig):
     db: str
     name: str = "sqlite"
 
 
-@dataclass
+@dataclass(frozen=True)
 class PostgresConfig(StoreConfig):
     username: str
     password: str
@@ -74,7 +75,7 @@ class PostgresConfig(StoreConfig):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class FileConfig(StoreConfig):
     name = "file"
     directory = "tasks"
