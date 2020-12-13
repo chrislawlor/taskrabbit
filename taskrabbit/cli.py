@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 from . import config
@@ -88,9 +89,13 @@ def main():
     logging.basicConfig(level=log_level)
     logging.debug("Loaded configuration: %s", cfg)
 
-    try:
-        args.func(cfg, args)
-    except AttributeError as e:
-        logging.debug(str(e))
+    if not hasattr(args, "func"):
         # Didn't pass a subcommand
         parser.print_help()
+        sys.exit(1)
+
+    try:
+        args.func(cfg, args)
+    except Exception as e:
+        logging.error(str(e))
+        sys.exit(2)
