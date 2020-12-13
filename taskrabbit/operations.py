@@ -42,8 +42,8 @@ def fill(exchange: str, store: TaskStore, task_name: Optional[str] = None) -> No
         counter.display()
 
 
-def drain(exchange_name: str, queue_name: str, store: TaskStore) -> None:
-    queue = Queue(queue_name, exchange=exchange_name)
+def drain(queue_name: str, store: TaskStore) -> None:
+    queue = Queue(queue_name)
     logging.info(f"Draining queue: {queue}")
 
     requeue: List[Message] = []

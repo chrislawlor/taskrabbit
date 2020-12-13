@@ -25,7 +25,7 @@ def init_store(cfg: config.Config) -> TaskStore:
 
 def drain_command(cfg: config.Config, args: argparse.Namespace) -> None:
     store = init_store(cfg)
-    drain(args.exchange, args.queue, store)
+    drain(args.queue, store)
     print("Stored tasks:")
     list_(store, counts=True)
 
@@ -45,10 +45,8 @@ def main():
     parser.add_argument("-c", "--config", default="taskrabbit.ini")
 
     parser.add_argument("-L", "--log-level", default=config.DEFAULT_LOG_LEVEL)
-    parser.add_argument(
-        "-x", "--exchange", default="celery", help="Publish tasks to this exchange"
-    )
-    subparsers = parser.add_subparsers()
+
+    subparsers = parser.add_subparsers(help="sub-command help")
 
     drain_parser = subparsers.add_parser("drain", help="Drain tasks from the queue")
     drain_parser.add_argument(
@@ -61,6 +59,7 @@ def main():
     drain_parser.set_defaults(func=drain_command)
 
     fill_parser = subparsers.add_parser("fill", help="Put tasks back on the queue")
+    fill_parser.add_argument("exchange", help="Publish tasks to this exchange")
     fill_parser.set_defaults(func=fill_command)
     fill_parser.add_argument(
         "-t", "--task", help="Optionally populate the queue with only this type of task"
