@@ -10,7 +10,7 @@ class SqliteTaskStore(TaskStore):
     def __init__(self, cfg: SqliteConfig):
         super().__init__()
         self.conn = sqlite3.connect(cfg.db)
-        self.conn.set_trace_callback(print)
+        self.conn.set_trace_callback(logging.debug)
         self.conn.row_factory = sqlite3.Row
         self.create_table()
 
