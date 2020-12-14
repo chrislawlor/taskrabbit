@@ -55,7 +55,7 @@ class Config:
 
 @dataclass(frozen=True)
 class SqliteConfig(StoreConfig):
-    db: str
+    db: str = "tasks.sqlite"
     name: str = "sqlite"
 
 
@@ -93,7 +93,7 @@ def _update_config(config, options):
                 config[k] = options[k]
 
 
-def load_config(*paths: Path, **opts):
+def load_config(*paths: Path, **opts) -> Config:
     config_paths = list(filter(lambda p: p.exists(), paths))
 
     cfg = configparser.ConfigParser()
@@ -106,7 +106,9 @@ def load_config(*paths: Path, **opts):
     store_type = cfg["taskrabbit"]["store"]
     del cfg["taskrabbit"]["store"]
     store_cls = STORE_CONFIG_MAP[store_type]
-    store_cfg = store_cls(**cfg[store_type])
+    if store_type in cfg:
+        store_cfg = store_cls(**cfg[store_type])
+    else:
+        store_cfg = store_cls()
     rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
-    cfg = Config(rabbitmq=rabbit_cfg, store=store_cfg, **cfg["taskrabbit"])
-    return cfg
+    return Config(rabbitmq=rabbit_cfg, store=store_cfg, **cfg["taskrabbit"])
