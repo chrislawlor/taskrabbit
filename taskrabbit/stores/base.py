@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from kombu import Message
 
@@ -14,14 +14,14 @@ class StoredTask:
     # args: List[Any]
     # kwargs: Dict[str, Any]
 
-    def json(self):
+    def json(self, indent=2):
         return json.dumps(
             {
                 "headers": self.headers,
                 "body": self.body,
                 "routing_key": self.routing_key,
             },
-            indent=2,
+            indent=indent,
         )
 
     @classmethod

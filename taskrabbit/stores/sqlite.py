@@ -10,6 +10,7 @@ class SqliteTaskStore(TaskStore):
     def __init__(self, cfg: SqliteConfig):
         super().__init__()
         self.conn = sqlite3.connect(cfg.db)
+        self.conn.set_trace_callback(print)
         self.conn.row_factory = sqlite3.Row
         self.create_table()
 
@@ -42,18 +43,20 @@ class SqliteTaskStore(TaskStore):
         return c
 
     def save(self, task: StoredTask):
-        self.execute(
-            """
-        INSERT INTO tasks
-        VALUES
-            (?, ?, ?, ?, ?)
-        ON CONFLICT (id) DO NOTHING
-        """,
+        values = (
             task.id,
             task.task,
             task.argsrepr,
             task.kwargsrepr,
-            task.json(),
+            task.json(indent=0),
+        )
+        self.execute(
+            """
+        INSERT OR IGNORE INTO tasks
+        VALUES
+            (?, ?, ?, ?, ?)
+        """,
+            *values
         )
 
     def delete(self, task: StoredTask):
