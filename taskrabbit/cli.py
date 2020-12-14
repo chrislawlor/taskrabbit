@@ -50,16 +50,13 @@ def main():
     subparsers = parser.add_subparsers(help="sub-command help")
 
     drain_parser = subparsers.add_parser("drain", help="Drain tasks from the queue")
-    drain_parser.add_argument(
-        "queue",
-        help="Queue to drain tasks from.",
-    )
+    drain_parser.add_argument("queue", help="Queue to drain tasks from.")
     # drain_parser.add_argument(
     #     "-l", "--limit", help="Limit number of tasks retrieved", type=int
     # )
     drain_parser.set_defaults(func=drain_command)
 
-    fill_parser = subparsers.add_parser("fill", help="Put tasks back on the queue")
+    fill_parser = subparsers.add_parser("fill", help="Publish tasks to an exchange")
     fill_parser.add_argument("exchange", help="Publish tasks to this exchange")
     fill_parser.set_defaults(func=fill_command)
     fill_parser.add_argument(
