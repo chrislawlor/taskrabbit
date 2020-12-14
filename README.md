@@ -3,8 +3,8 @@
 Command line utility for moving Celery task messages
 in and out of RabbitMQ.
 
-Features multiple storage backends, currently file-based
-and Sqlite backends are implemented.
+Features multiple storage backends, currently SQLite, PostgreSQL, and file-based
+task stores are implemented.
 
 ## Demo
 
