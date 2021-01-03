@@ -1,16 +1,33 @@
 import argparse
 import logging
 import sys
+from enum import Enum
 from pathlib import Path
+from typing import Optional
 
-from . import config
+import typer
+
+from taskrabbit import __version__
+
+from .config import Config, load_config, DEFAULT_LOG_LEVEL, ConfigurationError
 from .operations import drain, fill, list_
 from .stores.base import TaskStore
 
+
 HOME_CONFIG_PATH = Path.home() / ".taskrabbit.ini"
 
+app = typer.Typer()
 
-def init_store(cfg: config.Config) -> TaskStore:
+
+class LogLevels(str, Enum):
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
+    critical = "critical"
+
+
+def init_store(cfg: Config) -> TaskStore:
     if cfg.store.name == "sqlite":
         from .stores.sqlite import SqliteTaskStore
 
@@ -24,75 +41,107 @@ def init_store(cfg: config.Config) -> TaskStore:
     return FileTaskStore(cfg.store)
 
 
-def drain_command(cfg: config.Config, args: argparse.Namespace) -> None:
+@app.command("drain")
+def drain_command(
+    ctx: typer.Context,
+    queue: str = typer.Argument(..., help="Queue to drain tasks from."),
+) -> None:
+    """
+    Drain tasks from the queue.
+    """
+    cfg = ctx.meta["config"]
     store = init_store(cfg)
-    drain(cfg, args.queue, store)
+    drain(cfg, queue, store)
     print("Stored tasks:")
     list_(store, counts=True)
 
 
-def fill_command(cfg: config.Config, args: argparse.Namespace) -> None:
+@app.command("fill")
+def fill_command(
+    ctx: typer.Context,
+    exchange: str = typer.Argument(
+        ..., help="Tasks will be published to this exchange"
+    ),
+    task_name: Optional[str] = typer.Option(
+        None, help="Only publish tasks with this name"
+    ),
+) -> None:
+    """
+    Publish tasks to an exchange.
+    """
+    cfg = ctx.meta["config"]
     store = init_store(cfg)
-    fill(cfg, args.exchange, store, task_name=args.task)
+    fill(cfg, exchange, store, task_name)
 
 
-def list_command(cfg: config.Config, args: argparse.Namespace) -> None:
-    store = init_store(cfg)
-    list_(store, counts=args.counts, task_name=args.task, limit=args.limit)
+@app.command("list")
+def list_command(
+    ctx: typer.Context,
+    counts: bool = typer.Option(..., "--counts", help="Only show task counts, by name"),
+    task: Optional[str] = typer.Option(None, help="List only tasks with this name."),
+    limit: Optional[int] = typer.Option(None, help="Limit number of tasks shown"),
+) -> None:
+    """
+    Show retrieved tasks.
+    """
+    store = init_store(ctx.meta["config"])
+    list_(store, counts=counts, task_name=task, limit=limit)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", default="taskrabbit.ini")
+def show_version(value: bool):
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
 
-    parser.add_argument("-L", "--log-level", default=config.DEFAULT_LOG_LEVEL)
 
-    subparsers = parser.add_subparsers(help="sub-command help")
+def check_config(value) -> Config:
+    if value is None:
+        path = Path("taskrabbit.ini")
+        if path.exists():
+            return path
+    else:
+        path = value.absolute()
+        if not path.exists():
+            raise typer.BadParameter(f"Config file does not exist at {path}")
+        return value
 
-    drain_parser = subparsers.add_parser("drain", help="Drain tasks from the queue")
-    drain_parser.add_argument("queue", help="Queue to drain tasks from.")
-    # drain_parser.add_argument(
-    #     "-l", "--limit", help="Limit number of tasks retrieved", type=int
-    # )
-    drain_parser.set_defaults(func=drain_command)
 
-    fill_parser = subparsers.add_parser("fill", help="Publish tasks to an exchange")
-    fill_parser.add_argument("exchange", help="Publish tasks to this exchange")
-    fill_parser.set_defaults(func=fill_command)
-    fill_parser.add_argument(
-        "-t", "--task", help="Optionally populate the queue with only this type of task"
-    )
-
-    list_parser = subparsers.add_parser("list", help="Show retrieved tasks")
-    list_parser.add_argument(
-        "-c", "--counts", help="Display counts for each task type", action="store_true"
-    )
-    list_parser.add_argument(
-        "-l", "--limit", help="Limit number of rows shown.", type=int
-    )
-    list_parser.add_argument("-t", "--task", help="List tasks with this name")
-    list_parser.set_defaults(func=list_command)
-
-    args = parser.parse_args()
-
-    cfg = config.load_config(
-        HOME_CONFIG_PATH,
-        Path(args.config).absolute(),
-        taskrabbit={"log_level": args.log_level.upper()},
-    )
-
-    log_level = getattr(logging, cfg.log_level)
-
-    logging.basicConfig(level=log_level)
-    logging.debug("Loaded configuration: %s", cfg)
-
-    if not hasattr(args, "func"):
-        # Didn't pass a subcommand
-        parser.print_help()
-        sys.exit(1)
-
+@app.callback()
+def main(
+    ctx: typer.Context,
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        exists=True,
+        readable=True,
+        resolve_path=True,
+        callback=check_config,
+    ),
+    log_level: str = typer.Option(LogLevels.info, case_sensitive=False),
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        callback=show_version,
+        help="Display the program version.",
+        is_eager=True,
+    ),
+):
+    """
+    Remove and restore Celery tasks from RabbitMQ.
+    """
+    config_paths = [HOME_CONFIG_PATH]
+    if config is not None:
+        config_paths.append(config)
     try:
-        args.func(cfg, args)
-    except Exception as e:
-        logging.error(str(e))
-        sys.exit(2)
+        cfg = load_config(
+            *config_paths,
+            taskrabbit={"log_level": log_level.upper()},
+        )
+        log_level = getattr(logging, cfg.log_level)
+        logging.basicConfig(level=log_level)
+        logging.debug("Loaded configuration: %s", cfg)
+
+        ctx.meta["config"] = cfg
+    except ConfigurationError as exc:
+        raise typer.BadParameter(str(exc)) from exc

@@ -26,6 +26,10 @@ DEFAULTS = {
 CONFIG_PATHS = [Path.home() / ".taskrabbit.ini", Path("taskrabbit.ini")]
 
 
+class ConfigurationError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class RabbitMQConfig:
     username: str
@@ -95,6 +99,8 @@ def _update_config(config, options):
 
 def load_config(*paths: Path, **opts) -> Config:
     config_paths = list(filter(lambda p: p.exists(), paths))
+    if not config_paths:
+        raise ConfigurationError("No config file found.")
 
     cfg = configparser.ConfigParser()
 

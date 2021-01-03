@@ -1,3 +1,4 @@
 kombu>=5.0.2,<6
 librabbitmq>=2.0.0,<3
 termtables>=0.2.3,<1
+typer[shellingham]>=0.3.2
