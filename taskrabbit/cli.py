@@ -1,6 +1,4 @@
-import argparse
 import logging
-import sys
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -9,7 +7,7 @@ import typer
 
 from taskrabbit import __version__
 
-from .config import Config, load_config, DEFAULT_LOG_LEVEL, ConfigurationError
+from .config import Config, load_config, ConfigurationError
 from .operations import drain, fill, list_
 from .stores.base import TaskStore
 
@@ -134,10 +132,7 @@ def main(
     if config is not None:
         config_paths.append(config)
     try:
-        cfg = load_config(
-            *config_paths,
-            taskrabbit={"log_level": log_level.upper()},
-        )
+        cfg = load_config(*config_paths, taskrabbit={"log_level": log_level.upper()})
         log_level = getattr(logging, cfg.log_level)
         logging.basicConfig(level=log_level)
         logging.debug("Loaded configuration: %s", cfg)

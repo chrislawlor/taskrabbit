@@ -29,6 +29,7 @@ class PostgresTaskStore(TaskStore):
     def execute(self, query: str, *params) -> pg.extensions.cursor:
         c = self.conn.cursor()
         try:
+            logging.debug(c.mogrify(query, params))
             c.execute(query, params)
             self.conn.commit()
         except Exception as e:
@@ -52,6 +53,11 @@ class PostgresTaskStore(TaskStore):
             task.json(),
         )
 
+    def bulk_save(self, tasks: Iterable[StoredTask]):
+        # https://stackoverflow.com/a/12207237/21245
+        # https://www.psycopg.org/docs/usage.html#using-copy-to-and-copy-from
+        pass
+
     def delete(self, task: StoredTask):
         self.execute(
             """
@@ -71,5 +77,5 @@ class PostgresTaskStore(TaskStore):
                 "SELECT task_data FROM tasks WHERE task=%s", task_name
             )
         for row in cursor.fetchall():
-            logging.debug(f"{row=}")
+            logging.debug(f"{row}")
             yield StoredTask(**row[0])

@@ -47,7 +47,7 @@ class RabbitMQConfig:
 
 
 class StoreConfig:
-    pass
+    name: str
 
 
 @dataclass

@@ -70,6 +70,10 @@ class TaskStore(ABC):
     def save(self, task: StoredTask):
         ...
 
+    def bulk_save(self, tasks: Iterable[StoredTask]):
+        for task in tasks:
+            self.save(task)
+
     @abstractmethod
     def load_tasks(self, task_name=Optional[str]) -> Iterable[StoredTask]:
         ...
