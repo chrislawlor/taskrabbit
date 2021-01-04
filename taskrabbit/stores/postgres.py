@@ -77,5 +77,5 @@ class PostgresTaskStore(TaskStore):
                 "SELECT task_data FROM tasks WHERE task=%s", task_name
             )
         for row in cursor.fetchall():
-            logging.debug(f"{row}")
+            logging.debug(f"{row=}")
             yield StoredTask(**row[0])
