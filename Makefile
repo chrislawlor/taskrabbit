@@ -19,7 +19,7 @@ worker-shell:
 	docker-compose run --rm worker bash
 
 drain:
-	docker-compose run --rm app python -m taskrabbit -q arithmetic drain
+	docker-compose run --rm app python -m taskrabbit drain arithmetic
 
 fill:
 	docker-compose run --rm app python -m taskrabbit -x tasks fill

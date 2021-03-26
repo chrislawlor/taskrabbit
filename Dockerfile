@@ -12,6 +12,7 @@ FROM base
 
 COPY requirements/ requirements/
 RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements/base.txt
+RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements/extras/postgres.txt
 
 COPY taskrabbit .
 
