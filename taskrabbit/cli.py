@@ -57,17 +57,23 @@ def drain_command(
 @app.command("fill")
 def fill_command(
     ctx: typer.Context,
-    exchange: str = typer.Argument(
-        ..., help="Tasks will be published to this exchange"
-    ),
+    exchange: str = typer.Argument("", help="Tasks will be published to this exchange"),
     task_name: Optional[str] = typer.Option(
         None, help="Only publish tasks with this name"
     ),
     delete: bool = typer.Option(True, help="Delete tasks from store after publishing."),
+    confirm: bool = typer.Option(True, help="Confirm exchange before publishing"),
 ) -> None:
     """
     Publish tasks to an exchange.
     """
+
+    # Confirm exhange
+    exchange_display = exchange if exchange else "default"
+    if confirm:
+        confirmed = typer.confirm(f"Publish tasks to the {exchange_display} exchange?")
+        if not confirmed:
+            raise typer.Abort()
     cfg = ctx.meta["config"]
     store = init_store(cfg)
     fill(cfg, exchange, store, task_name, delete)
