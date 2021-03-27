@@ -112,6 +112,10 @@ def list_(
     else:
         items = []
         for task in stream:
-            items.append((task.id, task.task, task.argsrepr, task.kwargsrepr))
+            items.append(
+                (task.id, task.task, task.argsrepr, task.kwargsrepr, task.routing_key)
+            )
         if items:
-            termtables.print(items, header=["ID", "Task", "Args", "Kwargs"])
+            termtables.print(
+                items, header=["ID", "Task", "Args", "Kwargs", "Routing Key"]
+            )
