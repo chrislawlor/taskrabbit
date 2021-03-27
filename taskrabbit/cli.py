@@ -10,11 +10,14 @@ from taskrabbit import __version__
 from .config import Config, load_config, ConfigurationError
 from .operations import drain, fill, list_
 from .stores.base import TaskStore
+from .utils import pluralize, green, red
 
 
 HOME_CONFIG_PATH = Path.home() / ".taskrabbit.ini"
 
 app = typer.Typer()
+store_app = typer.Typer()
+app.add_typer(store_app, name="store")
 
 
 class LogLevels(str, Enum):
@@ -37,6 +40,29 @@ def init_store(cfg: Config) -> TaskStore:
     from .stores.file import FileTaskStore
 
     return FileTaskStore(cfg.store)
+
+
+@store_app.command("dedupe")
+def de_duplicate(ctx: typer.Context):
+    """
+    Remove duplicate tasks.
+    """
+    confirmed = typer.confirm(red("This is a destructive operation. Continue?"))
+    if not confirmed:
+        raise typer.Abort()
+    cfg = ctx.meta["config"]
+    store = init_store(cfg)
+    try:
+        count = store.dedupe()
+    except NotImplementedError:
+        typer.echo(
+            red(f"{store.__class__.__name__} does not support task de-duplication."),
+        )
+        raise typer.Exit(code=1)
+    # count_display = typer.style(str(count), fg=typer.colors.GREEN)
+    typer.echo(
+        f"Removed {green(count)} duplicate task{pluralize(count)} from the store."
+    )
 
 
 @app.command("drain")
@@ -79,7 +105,7 @@ def fill_command(
     fill(cfg, exchange, store, task_name, delete)
 
 
-@app.command("list")
+@store_app.command("list")
 def list_command(
     ctx: typer.Context,
     counts: bool = typer.Option(

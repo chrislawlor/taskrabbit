@@ -81,3 +81,13 @@ class TaskStore(ABC):
     @abstractmethod
     def delete(self, task: StoredTask):
         ...
+
+    # Optional functionality
+
+    def dedupe(self) -> int:
+        """
+        Remove duplicate tasks from the store.
+
+        Returns the number of tasks removed.
+        """
+        raise NotImplementedError()

@@ -79,3 +79,15 @@ class PostgresTaskStore(TaskStore):
         for row in cursor.fetchall():
             logging.debug(f"{row=}")
             yield StoredTask(**row[0])
+
+    def dedupe(self) -> int:
+        cur = self.execute(
+            """
+        DELETE FROM tasks
+        WHERE id not in (
+            SELECT max(id) from tasks
+            GROUP BY task, args, kwargs
+        );
+        """
+        )
+        return cur.rowcount

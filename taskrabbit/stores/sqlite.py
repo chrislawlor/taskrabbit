@@ -76,3 +76,15 @@ class SqliteTaskStore(TaskStore):
             cursor = self.execute("SELECT * FROM tasks WHERE task=?", task_name)
         for row in cursor.fetchall():
             yield StoredTask.from_string(row["json"])
+
+    def dedupe(self) -> int:
+        cur = self.execute(
+            """
+        DELETE FROM tasks
+        WHERE id not in (
+            SELECT max(id) from tasks
+            GROUP BY task, args, kwargs
+        );
+        """
+        )
+        return cur.rowcount
