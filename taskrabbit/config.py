@@ -42,8 +42,12 @@ class RabbitMQConfig:
     def url(self):
         return (
             f"amqp://{self.username}:{self.password}@"
-            f"{self.host}:{self.port}/{self.vhost}"
+            f"{self.host}:{self.port}{self.vhost}"
         )
+
+    def __post_init__(self):
+        if not self.vhost.startswith("/"):
+            raise ValueError(f"{self.__class__.__name__}.vhost must have a leading /")
 
 
 class StoreConfig:
