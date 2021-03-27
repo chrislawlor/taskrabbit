@@ -27,6 +27,7 @@ def fill(
     exchange_name: str,
     store: TaskStore,
     task_name: Optional[str] = None,
+    delete: bool = True,
 ) -> None:
     # Don't publish to system exchanges
     if exchange_name.startswith("amq"):
@@ -51,7 +52,8 @@ def fill(
                         routing_key=task.routing_key,
                         headers=task.headers,
                     )
-                    store.delete(task)
+                    if delete:
+                        store.delete(task)
                 counter.display()
             except AMQPNotFound as ex:
                 logging.error(str(ex))

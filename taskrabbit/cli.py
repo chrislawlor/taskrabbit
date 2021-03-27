@@ -63,19 +63,22 @@ def fill_command(
     task_name: Optional[str] = typer.Option(
         None, help="Only publish tasks with this name"
     ),
+    delete: bool = typer.Option(True, help="Delete tasks from store after publishing."),
 ) -> None:
     """
     Publish tasks to an exchange.
     """
     cfg = ctx.meta["config"]
     store = init_store(cfg)
-    fill(cfg, exchange, store, task_name)
+    fill(cfg, exchange, store, task_name, delete)
 
 
 @app.command("list")
 def list_command(
     ctx: typer.Context,
-    counts: bool = typer.Option(..., "--counts", help="Only show task counts, by name"),
+    counts: bool = typer.Option(
+        False, "--counts", "-c", help="Only show task counts, by name"
+    ),
     task: Optional[str] = typer.Option(None, help="List only tasks with this name."),
     limit: Optional[int] = typer.Option(None, help="Limit number of tasks shown"),
 ) -> None:
@@ -92,7 +95,7 @@ def show_version(value: bool):
         raise typer.Exit()
 
 
-def check_config(value) -> Config:
+def check_config(value) -> Optional[Path]:
     if value is None:
         path = Path("taskrabbit.ini")
         if path.exists():
@@ -102,6 +105,7 @@ def check_config(value) -> Config:
         if not path.exists():
             raise typer.BadParameter(f"Config file does not exist at {path}")
         return value
+    return None
 
 
 @app.callback()

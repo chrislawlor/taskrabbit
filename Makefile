@@ -22,7 +22,7 @@ drain:
 	docker-compose run --rm app python -m taskrabbit drain arithmetic
 
 fill:
-	docker-compose run --rm app python -m taskrabbit -x tasks fill
+	docker-compose run --rm app python -m taskrabbit fill tasks
 
 list:
 	docker-compose run --rm app python -m taskrabbit list -c
