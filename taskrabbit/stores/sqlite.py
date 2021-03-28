@@ -7,6 +7,8 @@ from .base import TaskStore, StoredTask
 
 
 class SqliteTaskStore(TaskStore):
+    config_class = SqliteConfig
+
     def __init__(self, cfg: SqliteConfig):
         super().__init__()
         self.conn = sqlite3.connect(cfg.db)

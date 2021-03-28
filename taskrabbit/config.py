@@ -3,6 +3,8 @@ import configparser
 from dataclasses import dataclass
 from pathlib import Path
 
+from taskrabbit.utils import import_string
+
 
 DEFAULT_LOG_LEVEL = "INFO"
 
@@ -89,9 +91,6 @@ class FileConfig(StoreConfig):
     directory = "tasks"
 
 
-STORE_CONFIG_MAP = {"sqlite": SqliteConfig, "postgres": PostgresConfig}
-
-
 def _update_config(config, options):
     for k, v in config.items():
         if k in options:
@@ -113,12 +112,13 @@ def load_config(*paths: Path, **opts) -> Config:
 
     _update_config(cfg, opts)
 
-    store_type = cfg["taskrabbit"]["store"]
+    store_path = cfg["taskrabbit"]["store"]
     del cfg["taskrabbit"]["store"]
-    store_cls = STORE_CONFIG_MAP[store_type]
-    if store_type in cfg:
-        store_cfg = store_cls(**cfg[store_type])
+    store_cls = import_string(store_path)
+    store_config_cls = store_cls.config_class
+    if "store" in cfg:
+        store_cfg = store_config_cls(**cfg["store"])
     else:
-        store_cfg = store_cls()
+        store_cfg = store_config_cls()
     rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
     return Config(rabbitmq=rabbit_cfg, store=store_cfg, **cfg["taskrabbit"])

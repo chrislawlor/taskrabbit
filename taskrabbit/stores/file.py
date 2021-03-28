@@ -7,6 +7,8 @@ from .base import TaskStore, StoredTask
 
 
 class FileTaskStore(TaskStore):
+    config_class = FileConfig
+
     def __init__(self, cfg: FileConfig):
         self.path = Path() / cfg.directory
         self.path.mkdir(parents=True, exist_ok=True)

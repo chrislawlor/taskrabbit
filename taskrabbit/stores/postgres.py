@@ -8,6 +8,8 @@ from .base import StoredTask, TaskStore
 
 
 class PostgresTaskStore(TaskStore):
+    config_class = PostgresConfig
+
     def __init__(self, cfg: PostgresConfig):
         self.conn = pg.connect(dsn=cfg.get_dsn())
         self.create_table()
