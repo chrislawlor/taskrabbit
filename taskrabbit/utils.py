@@ -1,5 +1,10 @@
 import typer
+from contextlib import contextmanager
 from importlib import import_module
+
+from halo import Halo
+
+SPINNER = "dots12"
 
 
 def pluralize(count: int):
@@ -34,3 +39,9 @@ def import_string(dotted_path):
             'Module "%s" does not define a "%s" attribute/class'
             % (module_path, class_name)
         ) from err
+
+
+@contextmanager
+def spinner(text: str):
+    with Halo(text=text, spinner=SPINNER):
+        yield

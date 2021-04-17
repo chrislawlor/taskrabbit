@@ -2,8 +2,10 @@ import configparser
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping
 
 from taskrabbit.utils import import_string
+from taskrabbit.stores.base import TaskStore
 
 
 DEFAULT_LOG_LEVEL = "INFO"
@@ -58,9 +60,28 @@ class StoreConfig:
 
 @dataclass
 class Config:
-    store: StoreConfig
+    store_config: StoreConfig
     log_level: str
     rabbitmq: RabbitMQConfig
+    store_class: TaskStore
+
+    @classmethod
+    def from_config_dict(cls, cfg: Mapping):
+        store_path = cfg["taskrabbit"]["store"]
+        del cfg["taskrabbit"]["store"]
+        store_cls = import_string(store_path)
+        store_config_cls = store_cls.config_class
+        if "store" in cfg:
+            store_cfg = store_config_cls(**cfg["store"])
+        else:
+            store_cfg = store_config_cls()
+        rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
+        config = cls(rabbitmq=rabbit_cfg, store_config=store_cfg, **cfg["taskrabbit"])
+        config.store_class = store_cls
+        return config
+
+    def init_store(self):
+        return self.store_class(self.store_config)
 
 
 @dataclass(frozen=True)
@@ -92,6 +113,9 @@ class FileConfig(StoreConfig):
 
 
 def _update_config(config, options):
+    """
+    Recursively overwrite keys in `config` with values from `options`.
+    """
     for k, v in config.items():
         if k in options:
             if hasattr(v, "items"):
@@ -100,7 +124,13 @@ def _update_config(config, options):
                 config[k] = options[k]
 
 
-def load_config(*paths: Path, **opts) -> Config:
+def merge_config_files_and_options(*paths: Path, **opts) -> configparser.ConfigParser:
+    """
+    Load + merge multiple config paths, overriding values with
+    kwarg options.
+
+    Will raise ConfigurationError if at least one path is not found.
+    """
     config_paths = list(filter(lambda p: p.exists(), paths))
     if not config_paths:
         raise ConfigurationError("No config file found.")
@@ -112,13 +142,4 @@ def load_config(*paths: Path, **opts) -> Config:
 
     _update_config(cfg, opts)
 
-    store_path = cfg["taskrabbit"]["store"]
-    del cfg["taskrabbit"]["store"]
-    store_cls = import_string(store_path)
-    store_config_cls = store_cls.config_class
-    if "store" in cfg:
-        store_cfg = store_config_cls(**cfg["store"])
-    else:
-        store_cfg = store_config_cls()
-    rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
-    return Config(rabbitmq=rabbit_cfg, store=store_cfg, **cfg["taskrabbit"])
+    return cfg

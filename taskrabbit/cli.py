@@ -7,9 +7,12 @@ import typer
 
 from taskrabbit import __version__
 
-from .config import Config, load_config, ConfigurationError
+from .config import (
+    Config,
+    ConfigurationError,
+    merge_config_files_and_options,
+)
 from .operations import drain, fill, list_
-from .stores.base import TaskStore
 from .utils import pluralize, green, red
 
 
@@ -28,20 +31,6 @@ class LogLevels(str, Enum):
     critical = "critical"
 
 
-def init_store(cfg: Config) -> TaskStore:
-    if cfg.store.name == "sqlite":
-        from .stores.sqlite import SqliteTaskStore
-
-        return SqliteTaskStore(cfg.store)
-    if cfg.store.name == "postgres":
-        from .stores.postgres import PostgresTaskStore
-
-        return PostgresTaskStore(cfg.store)
-    from .stores.file import FileTaskStore
-
-    return FileTaskStore(cfg.store)
-
-
 @store_app.command("dedupe")
 def de_duplicate(ctx: typer.Context):
     """
@@ -51,7 +40,7 @@ def de_duplicate(ctx: typer.Context):
     if not confirmed:
         raise typer.Abort()
     cfg = ctx.meta["config"]
-    store = init_store(cfg)
+    store = cfg.init_store()
     try:
         count = store.dedupe()
     except NotImplementedError:
@@ -74,7 +63,7 @@ def drain_command(
     Drain tasks from the queue.
     """
     cfg = ctx.meta["config"]
-    store = init_store(cfg)
+    store = cfg.init_store()
     drain(cfg, queue, store)
     print("Stored tasks:")
     list_(store, counts=True)
@@ -101,7 +90,7 @@ def fill_command(
         if not confirmed:
             raise typer.Abort()
     cfg = ctx.meta["config"]
-    store = init_store(cfg)
+    store = cfg.init_store()
     fill(cfg, exchange, store, task_name, delete)
 
 
@@ -117,7 +106,8 @@ def list_command(
     """
     Show retrieved tasks.
     """
-    store = init_store(ctx.meta["config"])
+    cfg = ctx.meta["config"]
+    store = cfg.init_store()
     list_(store, counts=counts, task_name=task, limit=limit)
 
 
@@ -168,7 +158,10 @@ def main(
     if config is not None:
         config_paths.append(config)
     try:
-        cfg = load_config(*config_paths, taskrabbit={"log_level": log_level.upper()})
+        cfg_dict = merge_config_files_and_options(
+            *config_paths, taskrabbit={"log_level": log_level.upper()}
+        )
+        cfg = Config.from_config_dict(cfg_dict)
         log_level = getattr(logging, cfg.log_level)
         logging.basicConfig(level=log_level)
         logging.debug("Loaded configuration: %s", cfg)
