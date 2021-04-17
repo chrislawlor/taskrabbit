@@ -19,7 +19,7 @@ from .utils import pluralize, green, red
 HOME_CONFIG_PATH = Path.home() / ".taskrabbit.ini"
 
 app = typer.Typer()
-store_app = typer.Typer()
+store_app = typer.Typer(short_help="Interact with stored tasks.")
 app.add_typer(store_app, name="store")
 
 

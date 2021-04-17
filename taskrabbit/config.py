@@ -76,8 +76,12 @@ class Config:
         else:
             store_cfg = store_config_cls()
         rabbit_cfg = RabbitMQConfig(**cfg["rabbitmq"])
-        config = cls(rabbitmq=rabbit_cfg, store_config=store_cfg, **cfg["taskrabbit"])
-        config.store_class = store_cls
+        config = cls(
+            rabbitmq=rabbit_cfg,
+            store_config=store_cfg,
+            store_class=store_cls,
+            **cfg["taskrabbit"],
+        )
         return config
 
     def init_store(self):

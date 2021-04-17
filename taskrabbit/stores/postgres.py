@@ -1,3 +1,6 @@
+"""
+Store tasks in PostgreSQL.
+"""
 import logging
 from typing import Iterable, Optional
 

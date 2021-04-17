@@ -1,10 +1,10 @@
 from setuptools import setup
 import os
 import sys
+from pathlib import Path
 
 
 assert sys.version_info >= (3, 6, 0), "taskrabbit requires Python 3.6+"
-from pathlib import Path
 
 PROJECT_DIR = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_DIR))
@@ -16,12 +16,12 @@ def get_long_description() -> str:
     return (PROJECT_DIR / "README.md").read_text(encoding="utf8")
 
 
-## REQUIREMENTS
-## requirements parsing borrowed from Celery project.
+# REQUIREMENTS
+# requirements parsing borrowed from Celery project.
 
 
-def _strip_comments(l):
-    return l.split("#", 1)[0].strip()
+def _strip_comments(line):
+    return line.split("#", 1)[0].strip()
 
 
 def _pip_requirement(req):
@@ -35,8 +35,8 @@ def _reqs(*f):
     return [
         _pip_requirement(r)
         for r in (
-            _strip_comments(l)
-            for l in open(os.path.join(os.getcwd(), "requirements", *f)).readlines()
+            _strip_comments(line)
+            for line in open(os.path.join(os.getcwd(), "requirements", *f)).readlines()
         )
         if r
     ]
@@ -77,7 +77,7 @@ setup(
     author="Chris Lawlor",
     url="https://github.com/chrislawlor/taskrabbit",
     license="MIT",
-    packages=["taskrabbit"],
+    packages=["taskrabbit", "taskrabbit.stores"],
     python_requires=">=3.6",
     zip_safe=False,
     install_requires=install_requires(),

@@ -14,7 +14,9 @@ COPY requirements/ requirements/
 RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements/base.txt
 RUN --mount=type=cache,target=/root/.cache/pip python -m pip install -r requirements/extras/postgres.txt
 
-COPY taskrabbit .
-
+COPY taskrabbit/ taskrabbit/
+COPY setup.py .
+COPY README.md .
+RUN pip install .
 
 CMD ["python", "taskrabbit"]
