@@ -70,7 +70,7 @@ def extras_require():
 
 setup(
     name="taskrabbit",
-    version="0.4.0",
+    version="0.4.1",
     description="Move Celery tasks in and out of RabbitMQ",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
