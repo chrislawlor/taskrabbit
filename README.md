@@ -8,6 +8,12 @@ in and out of RabbitMQ.
 Features multiple storage backends, currently SQLite, PostgreSQL, and file-based
 task stores are implemented.
 
+## Installation
+
+Taskrabbit is developed and tested on Python 3.8
+
+`python3 -m pip install --user taskrabbit`
+
 ## Documentation
 
 View the [Taskrabbit documentation](https://taskrabbit.readthedocs.io/en/latest/) online at ReadTheDocs.

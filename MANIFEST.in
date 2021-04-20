@@ -1,0 +1,6 @@
+include LICENSE.txt
+include README.md
+include setup.py
+include setup.cfg
+
+recursive-include requirements *.txt
