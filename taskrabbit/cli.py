@@ -7,14 +7,9 @@ import typer
 
 from taskrabbit import __version__
 
-from .config import (
-    Config,
-    ConfigurationError,
-    merge_config_files_and_options,
-)
+from .config import Config, ConfigurationError, merge_config_files_and_options
 from .operations import drain, fill, list_
-from .utils import pluralize, green, red
-
+from .utils import green, pluralize, red
 
 HOME_CONFIG_PATH = Path.home() / ".taskrabbit.ini"
 
@@ -142,7 +137,7 @@ def main(
         resolve_path=True,
         callback=check_config,
     ),
-    log_level: str = typer.Option(LogLevels.info, case_sensitive=False),
+    log_level: LogLevels = typer.Option(LogLevels.info, case_sensitive=False),
     version: Optional[bool] = typer.Option(
         None,
         "--version",
